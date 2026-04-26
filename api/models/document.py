@@ -15,5 +15,5 @@ class Document(Base):
     content_type: Mapped[str] = mapped_column(String(100), nullable=False)
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.now(UTC), nullable=False
+        DateTime(timezone=True), default=datetime.now(UTC), nullable=False, index=True
     )

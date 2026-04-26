@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from uuid import uuid4
 
+import aiofiles
 from fastapi import APIRouter, HTTPException, UploadFile, status
 
 from api.config import settings
@@ -10,14 +11,30 @@ from api.models.document import Document
 from api.schemas.document import DocumentResponse
 
 router = APIRouter(tags=["Documents"])
-MAX_FILE_SIZE = settings.MAX_FILE_SIZE_MB * 1024 * 1024
-UPLOADS_DIR = Path(settings.UPLOADS_DIR)
 
-UPLOADS_DIR.mkdir(exist_ok=True, parents=True)
+
+def get_uploads_dir() -> Path:
+    uploads_dir = Path(settings.UPLOADS_DIR)
+    uploads_dir.mkdir(exist_ok=True, parents=True)
+    return uploads_dir
+
+
+async def read_file_with_limit(file: UploadFile, max_size: int) -> bytes:
+    content = b""
+    while chunk := await file.read(8192):
+        if len(content) + len(chunk) > max_size:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File too large. Maximum size is {max_size // (1024 * 1024)}MB",
+            )
+        content += chunk
+    return content
 
 
 @router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 async def upload_document(file: UploadFile, db: GetDB) -> DocumentResponse:
+    max_file_size = settings.MAX_FILE_SIZE_MB * 1024 * 1024
+
     if file.content_type != "application/pdf":
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
@@ -28,24 +45,31 @@ async def upload_document(file: UploadFile, db: GetDB) -> DocumentResponse:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Filename is required",
         )
-
-    content = await file.read()
-    if len(content) > MAX_FILE_SIZE:
+    ext = os.path.splitext(file.filename)[1].lower()
+    if not ext or ext not in (".pdf",):
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File too large. Maximum size is {MAX_FILE_SIZE // (1024 * 1024)}MB",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Filename must have a valid PDF extension",
         )
 
-    file_id = uuid4()
+    content = await read_file_with_limit(file, max_file_size)
 
-    file_path = Path(UPLOADS_DIR) / (str(file_id) + os.path.splitext(file.filename)[1])
+    file_id = uuid4()
+    file_path = get_uploads_dir() / (str(file_id) + ext)
+    file_path_str = str(file_path)
 
     try:
-        with open(file_path, "wb") as f:
-            f.write(content)
+        async with aiofiles.open(file_path_str, "wb") as f:
+            await f.write(content)
     except Exception as e:
+        try:
+            if file_path.exists():
+                file_path.unlink()
+        except Exception:
+            pass
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to save file: {e}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save file",
         ) from e
 
     doc = Document(
@@ -54,8 +78,16 @@ async def upload_document(file: UploadFile, db: GetDB) -> DocumentResponse:
         content_type=file.content_type,
         size_bytes=len(content),
     )
-    db.add(doc)
-    await db.commit()
-    await db.refresh(doc)
+    try:
+        db.add(doc)
+        await db.commit()
+        await db.refresh(doc)
+    except Exception as e:
+        if file_path.exists():
+            file_path.unlink()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save document metadata",
+        ) from e
 
     return DocumentResponse.model_validate(doc)
