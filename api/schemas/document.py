@@ -11,4 +11,5 @@ class DocumentResponse(BaseModel):
     filename: str
     content_type: str
     size_bytes: int
+    status: str
     created_at: datetime
