@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Request, UploadFile, status
 
 from api.config import settings
 from api.database import GetDB
-from api.models.document import Document
+from api.models.document import Document, DocumentStatus
 from api.schemas.document import DocumentResponse
 
 router = APIRouter(tags=["Documents"])
@@ -34,7 +34,7 @@ async def read_file_with_limit(file: UploadFile, max_size: int) -> bytes:
 
 
 @router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
-async def upload_document(file: UploadFile, db: GetDB) -> DocumentResponse:
+async def upload_document(req: Request, file: UploadFile, db: GetDB) -> DocumentResponse:
     max_file_size = settings.MAX_FILE_SIZE_MB * 1024 * 1024
 
     if file.content_type != "application/pdf":
@@ -79,7 +79,9 @@ async def upload_document(file: UploadFile, db: GetDB) -> DocumentResponse:
         filename=file.filename,
         content_type=file.content_type,
         size_bytes=len(content),
+        status=DocumentStatus.EXTRACTING,
     )
+
     try:
         db.add(doc)
         await db.commit()
@@ -92,13 +94,18 @@ async def upload_document(file: UploadFile, db: GetDB) -> DocumentResponse:
             detail="Failed to save document metadata",
         ) from e
 
+    extract_job = await req.app.state.arq_redis.enqueue_job("extract_text", file_path)
+    result = await extract_job.result()
+
+    chunk_job = await req.app.state.arq_redis.enqueue_job(
+        "chunk_text_task", result["text"], result["document_id"]
+    )
+    await chunk_job.result()
+
+    embed_job = await req.app.state.arq_redis.enqueue_job("embed_and_store", result["document_id"])
+    await embed_job.result()
+
     return DocumentResponse.model_validate(doc)
-
-
-@router.get("/test")
-async def test(req: Request):
-    job = await req.app.state.arq_redis.enqueue_job("oi")
-    return {"job": job.job_id, "status": "queued"}
 
 
 @router.get("/job/{job_id}")
