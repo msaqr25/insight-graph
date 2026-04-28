@@ -20,5 +20,8 @@ class Settings(BaseSettings):
     REDIS_USER: str
     REDIS_PASSWORD: str
 
+    EMBEDDING_MODEL: str
+    VECTOR_DIMENSION: int
+
 
 settings = Settings()  # type: ignore[call-arg]
