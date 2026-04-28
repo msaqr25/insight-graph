@@ -1,5 +1,5 @@
 from api.worker.config import REDIS_SETTINGS
-from api.worker.tasks.test_task import oi
+from api.worker.tasks import oi
 
 
 async def startup(ctx):
