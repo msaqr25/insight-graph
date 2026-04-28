@@ -1,9 +1,11 @@
 import os
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 import aiofiles
-from fastapi import APIRouter, HTTPException, UploadFile, status
+from arq.jobs import Job, JobResult, JobStatus
+from fastapi import APIRouter, HTTPException, Request, UploadFile, status
 
 from api.config import settings
 from api.database import GetDB
@@ -91,3 +93,33 @@ async def upload_document(file: UploadFile, db: GetDB) -> DocumentResponse:
         ) from e
 
     return DocumentResponse.model_validate(doc)
+
+
+@router.get("/test")
+async def test(req: Request):
+    job = await req.app.state.arq_redis.enqueue_job("oi")
+    return {"job": job.job_id, "status": "queued"}
+
+
+@router.get("/job/{job_id}")
+async def get_job_status(req: Request, job_id: str):
+    job = Job(job_id, req.app.state.arq_redis)
+    job_status = await job.status()
+
+    if job_status == JobStatus.not_found:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+
+    response: dict[str, Any] = {"job_id": job_id, "status": job_status.value}
+
+    if job_status == JobStatus.complete:
+        info = await job.info()
+
+        if isinstance(info, JobResult):
+            response["result"] = info.result
+            response["execution_time_ms"] = (
+                (info.finish_time - info.start_time).total_seconds() * 1000
+                if info.finish_time and info.start_time
+                else None
+            )
+
+    return response

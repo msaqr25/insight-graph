@@ -15,5 +15,10 @@ class Settings(BaseSettings):
     UPLOADS_DIR: str = "uploads"
     MAX_FILE_SIZE_MB: int = 10
 
+    REDIS_HOST: str
+    REDIS_PORT: int
+    REDIS_USER: str
+    REDIS_PASSWORD: str
+
 
 settings = Settings()  # type: ignore[call-arg]
