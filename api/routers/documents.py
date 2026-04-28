@@ -94,16 +94,7 @@ async def upload_document(req: Request, file: UploadFile, db: GetDB) -> Document
             detail="Failed to save document metadata",
         ) from e
 
-    extract_job = await req.app.state.arq_redis.enqueue_job("extract_text", file_path)
-    result = await extract_job.result()
-
-    chunk_job = await req.app.state.arq_redis.enqueue_job(
-        "chunk_text_task", result["text"], result["document_id"]
-    )
-    await chunk_job.result()
-
-    embed_job = await req.app.state.arq_redis.enqueue_job("embed_and_store", result["document_id"])
-    await embed_job.result()
+    await req.app.state.arq_redis.enqueue_job("extract_text", str(file_path), str(doc.id))
 
     return DocumentResponse.model_validate(doc)
 

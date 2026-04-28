@@ -19,9 +19,14 @@ class Settings(BaseSettings):
     REDIS_PORT: int
     REDIS_USER: str
     REDIS_PASSWORD: str
+    REDIS_DB: int = 0
 
     EMBEDDING_MODEL: str
     VECTOR_DIMENSION: int
+
+    CHUNK_MIN_SIZE: int = 200
+    CHUNK_MAX_SIZE: int = 1000
+    CHUNK_OVERLAP: int = 50
 
 
 settings = Settings()  # type: ignore[call-arg]
