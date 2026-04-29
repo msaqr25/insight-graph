@@ -1,10 +1,19 @@
+from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from arq.jobs import Job, JobResult, JobStatus
 from fastapi import APIRouter, HTTPException, Request, UploadFile, status
+from fastapi.responses import FileResponse
 
+from api.config import settings
 from api.database import GetDB
-from api.schemas.document import DocumentResponse
+from api.schemas.document import (
+    DocumentDeleteResponse,
+    DocumentListItem,
+    DocumentListResponse,
+    DocumentResponse,
+)
 from api.services.document_service import document_service
 from api.services.file_service import file_service
 
@@ -61,3 +70,56 @@ async def get_job_status(req: Request, job_id: str):
             )
 
     return response
+
+
+@router.get("/documents")
+async def list_documents(db: GetDB) -> DocumentListResponse:
+    documents = await document_service.get_all(db)
+
+    result = []
+    for doc in documents:
+        chunk_count = await document_service.get_chunk_count(db, doc.id)
+        result.append(
+            DocumentListItem(
+                id=doc.id,
+                filename=doc.filename,
+                status=doc.status.value,
+                chunk_count=chunk_count,
+                created_at=doc.created_at,
+            )
+        )
+
+    return DocumentListResponse(documents=result, total=len(result))
+
+
+@router.get("/documents/{document_id}")
+async def get_document(req: Request, document_id: str, db: GetDB) -> FileResponse:
+    from uuid import UUID
+
+    doc_id = UUID(document_id)
+    document = await document_service.get(db, doc_id)
+
+    if not document:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    file_path = Path(settings.UPLOADS_DIR) / f"{doc_id}.pdf"
+
+    if not file_path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+
+    return FileResponse(
+        path=file_path,
+        filename=document.filename,
+        media_type=document.content_type,
+    )
+
+
+@router.delete("/documents/{document_id}", response_model=DocumentDeleteResponse)
+async def delete_document(document_id: str, db: GetDB) -> DocumentDeleteResponse:
+    doc_id = UUID(document_id)
+    deleted = await document_service.delete(db, doc_id)
+
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    return DocumentDeleteResponse(id=doc_id, deleted=True)

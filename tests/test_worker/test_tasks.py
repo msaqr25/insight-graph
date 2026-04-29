@@ -171,8 +171,8 @@ class TestFileCleanup:
     """Tests for file cleanup."""
 
     @pytest.mark.asyncio
-    async def test_extract_text_deletes_file(self):
-        """Test extract_text deletes PDF after extraction."""
+    async def test_extract_text_preserves_file(self):
+        """Test extract_text preserves PDF for download."""
         from api.worker import tasks
 
         doc_id = str(uuid4())
@@ -194,11 +194,8 @@ class TestFileCleanup:
                 mock_page.get_text.return_value = "Text"
                 mock_pdf.open.return_value.__enter__.return_value = [mock_page]
 
-                with patch("api.worker.tasks.Path") as mock_path:
-                    mock_path.return_value = test_file
+                ctx = {"redis": mock_redis}
 
-                    ctx = {"redis": mock_redis}
+                await tasks.extract_text(ctx, "/tmp/test.pdf", doc_id)
 
-                    await tasks.extract_text(ctx, "/tmp/test.pdf", doc_id)
-
-                    test_file.unlink.assert_called_once()
+                test_file.unlink.assert_not_called()

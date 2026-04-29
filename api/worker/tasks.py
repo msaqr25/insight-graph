@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 from uuid import UUID
 
 import pymupdf
@@ -27,8 +26,6 @@ async def extract_text(ctx, file_path: str, document_id: str):
 
         document.status = DocumentStatus.CHUNKING
         db.commit()
-
-        Path(file_path).unlink(missing_ok=True)
 
     await redis.enqueue_job("chunk_text_task", text, document_id)
 
