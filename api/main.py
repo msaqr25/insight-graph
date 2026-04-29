@@ -6,7 +6,8 @@ from fastapi import FastAPI
 
 from api.config import settings
 from api.database import close_db, init_db
-from api.routers.documents import router
+from api.routers.documents import router as document_router
+from api.routers.query import router as query_router
 from api.worker.config import REDIS_SETTINGS
 
 
@@ -26,7 +27,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.include_router(router, prefix="/api")
+app.include_router(document_router, prefix="/api")
+app.include_router(query_router, prefix="/api")
 
 
 @app.get("/health")

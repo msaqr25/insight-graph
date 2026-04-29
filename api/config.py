@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str
     VECTOR_DIMENSION: int
 
+    RERANKER_MODEL: str
+
+    GOOGLE_API_KEY: str
+    GENAI_MODEL: str
+    COSINE_TOP_K: int = 20
+    RERANK_TOP_K: int = 3
+
     CHUNK_MIN_SIZE: int = 200
     CHUNK_MAX_SIZE: int = 1000
     CHUNK_OVERLAP: int = 50
