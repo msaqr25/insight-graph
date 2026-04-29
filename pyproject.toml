@@ -9,6 +9,7 @@ dependencies = [
     "arq>=0.28.0",
     "asyncpg>=0.31.0",
     "fastapi[standard]>=0.136.1",
+    "langchain-text-splitters>=1.1.2",
     "pgvector>=0.3.0",
     "psycopg2-binary>=2.9.10",
     "pymupdf>=1.27.2.3",

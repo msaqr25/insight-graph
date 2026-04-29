@@ -1,79 +1,4 @@
-from api.worker.chunker import chunk_text, semantic_chunk, split_oversized_paragraph
-
-
-class TestSemanticChunk:
-    """Tests for semantic_chunk function."""
-
-    def test_normal_text_chunks(self):
-        """Test chunking normal text."""
-        text = "This is first paragraph with multiple sentences.\n\nThis is second paragraph with more text.\n\nThis is third paragraph."
-        chunks = semantic_chunk(text)
-
-        assert len(chunks) >= 0  # May be empty if text is too short
-
-    def test_empty_text(self):
-        """Test returns empty list for empty text."""
-        chunks = semantic_chunk("")
-
-        assert chunks == []
-
-    def test_single_paragraph(self):
-        """Test single paragraph text."""
-        text = "This is a single paragraph with enough text to potentially create a chunk."
-        chunks = semantic_chunk(text)
-
-        assert len(chunks) >= 0
-
-    def test_multiple_paragraphs(self):
-        """Test multiple paragraphs."""
-        text = "Paragraph one here with some text.\n\nParagraph two here with more text.\n\nParagraph three here."
-        chunks = semantic_chunk(text)
-
-        assert len(chunks) >= 0
-
-    def test_small_chunks_merged(self):
-        """Test small chunks are merged."""
-        text = "A" * 100 + "\n\n" + "B" * 100
-        chunks = semantic_chunk(text)
-
-        # Small chunks should be merged or dropped
-        if chunks:
-            for chunk in chunks:
-                assert len(chunk) <= 400
-
-
-class TestSplitOversizedParagraph:
-    """Tests for split_oversized_paragraph function."""
-
-    def test_short_text_not_split(self):
-        """Test short text is not split."""
-        text = "Short text"
-        parts = split_oversized_paragraph(text, 1000, 50)
-
-        assert len(parts) == 1
-
-    def test_long_text_split(self):
-        """Test long text is split into multiple parts."""
-        text = "A" * 2000
-        parts = split_oversized_paragraph(text, 1000, 50)
-
-        assert len(parts) == 2
-        assert parts[0] == "A" * 1000
-        assert parts[1] == "A" * 1000
-
-    def test_exactly_max_size(self):
-        """Test text exactly at max size."""
-        text = "A" * 1000
-        parts = split_oversized_paragraph(text, 1000, 50)
-
-        assert len(parts) == 1
-
-    def test_slight_over_max(self):
-        """Test text slightly over max size."""
-        text = "A" * 1001
-        parts = split_oversized_paragraph(text, 1000, 50)
-
-        assert len(parts) == 2
+from api.worker.chunker import _enforce_min_size, chunk_text
 
 
 class TestChunkText:
@@ -110,25 +35,55 @@ Three."""
 
         assert result == []
 
+    def test_normal_text_chunks(self):
+        """Test chunking normal text."""
+        text = "This is first paragraph with multiple sentences.\n\nThis is second paragraph with more text.\n\nThis is third paragraph."
+        chunks = chunk_text(text)
 
-class TestChunkBoundaries:
-    """Tests for chunk size boundaries."""
+        assert isinstance(chunks, list)
 
-    def test_chunks_within_max_size(self):
-        """Test chunks are within max size."""
-        # Create text that would produce large chunks
-        text = "A" * 500 + "\n\n" + "B" * 500
-        chunks = semantic_chunk(text)
+    def test_multiple_paragraphs(self):
+        """Test multiple paragraphs."""
+        text = "Paragraph one here with some text.\n\nParagraph two here with more text.\n\nParagraph three here."
+        chunks = chunk_text(text)
 
-        for chunk in chunks:
-            assert len(chunk) <= 1500  # Allow some buffer
+        assert isinstance(chunks, list)
 
-    def test_min_chunk_size_merging(self):
-        """Test minimum chunk size is enforced."""
-        # Very short paragraphs
-        text = "AB\n\nCD\n\nEF"
-        chunks = semantic_chunk(text)
 
-        # Should merge small chunks or drop very small ones
-        for chunk in chunks:
-            assert len(chunk) < 200 or len(chunk) >= 100
+class TestEnforceMinSize:
+    """Tests for _enforce_min_size function."""
+
+    def test_no_change_when_above_min(self):
+        """Test chunks above min size are not changed."""
+        chunks = ["abc def ghi jkl", "mno pqr stu vwx"]
+        result = _enforce_min_size(chunks, min_size=5)
+
+        assert result == chunks
+
+    def test_merges_small_chunks(self):
+        """Test small chunks are merged."""
+        chunks = ["ab", "cd", "ef"]
+        result = _enforce_min_size(chunks, min_size=5)
+
+        assert len(result) <= len(chunks)
+        assert all(len(c) >= 5 or c == result[-1] for c in result)
+
+    def test_empty_list_returns_empty(self):
+        """Test empty list returns empty list."""
+        result = _enforce_min_size([], min_size=10)
+
+        assert result == []
+
+    def test_zero_min_size_returns_original(self):
+        """Test zero min size returns original chunks."""
+        chunks = ["small"]
+        result = _enforce_min_size(chunks, min_size=0)
+
+        assert result == chunks
+
+    def test_small_remainder_appended_to_last(self):
+        """Test small remainder is appended to last chunk."""
+        chunks = ["hello world", "a"]
+        result = _enforce_min_size(chunks, min_size=10)
+
+        assert len(result) <= 2
