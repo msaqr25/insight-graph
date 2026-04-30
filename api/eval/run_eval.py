@@ -12,27 +12,86 @@ from ragas.embeddings import LangchainEmbeddingsWrapper
 from ragas.metrics import answer_relevancy, context_recall, faithfulness
 
 GOLDEN_DATASET_PATH = Path("api/eval/golden_dataset.json")
-API_URL = "http://localhost:8000/api"
+API_URL = os.environ.get("EVAL_API_URL", "http://localhost:8000/api")
+LLM_MODEL = os.environ.get("EVAL_LLM_MODEL", "openai/gpt-oss-120b:free")
+EMBED_MODEL = os.environ.get("EVAL_EMBED_MODEL", "gemini-embedding-2")
 RESULTS_PATH = Path("api/eval/baseline_results.json")
 
 
+def validate_response(result: dict) -> tuple[str, list[str]]:
+    if not isinstance(result, dict):
+        raise ValueError(f"Expected dict response, got {type(result).__name__}")
+    if "answer" not in result:
+        raise ValueError("Response missing 'answer' field")
+    answer = result.get("answer", "")
+    sources = result.get("sources", [])
+    if not isinstance(sources, list):
+        raise ValueError(f"Expected 'sources' to be list, got {type(sources).__name__}")
+    contexts = []
+    for i, source in enumerate(sources):
+        if not isinstance(source, dict):
+            raise ValueError(f"Source[{i}] expected dict, got {type(source).__name__}")
+        if "content" not in source:
+            raise ValueError(f"Source[{i}] missing 'content' field")
+        contexts.append(source.get("content", ""))
+    return answer, contexts
+
+
 async def query_pipeline(question: str) -> dict:
-    async with httpx.AsyncClient(timeout=None) as client:
-        resp = await client.post(f"{API_URL}/query", json={"question": question})
-        return resp.json()
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(f"{API_URL}/query", json={"question": question})
+            resp.raise_for_status()
+            return resp.json()
+    except httpx.HTTPStatusError as e:
+        raise RuntimeError(f"API returned {e.response.status_code}: {e.response.text}") from e
+    except httpx.RequestError as e:
+        raise RuntimeError(f"Failed to connect to API at {API_URL}: {e}") from e
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"Invalid JSON response from API: {e}") from e
+
+
+def get_env_var(name: str) -> str:
+    value = os.environ.get(name)
+    if not value:
+        raise ValueError(f"Required environment variable '{name}' is not set")
+    return value
+
+
+def compute_avg_by_type(scores: dict, question_types: list[str]) -> dict:
+    if not scores:
+        return {}
+    metric_lengths = {metric: len(arr) for metric, arr in scores.items()}
+    if len(set(metric_lengths.values())) > 1:
+        raise ValueError(f"Metrics have inconsistent lengths: {metric_lengths}")
+    results: dict[str, dict[str, float] | None] = {}
+    for q_type in [
+        "single_paper_factual",
+        "cross_paper_comparison",
+        "multi_hop_relational",
+        "contradiction",
+    ]:
+        indices = [i for i, t in enumerate(question_types) if t == q_type]
+        if not indices:
+            results[q_type] = None
+            continue
+        results[q_type] = {
+            metric: sum(scores[metric][i] for i in indices) / len(indices) for metric in scores
+        }
+    return results
 
 
 async def run_evaluation():
+    api_key = get_env_var("OPENROUTER_API_KEY")
+
     llm = ChatOpenAI(
         base_url="https://openrouter.ai/api/v1",
-        api_key=os.environ["OPENROUTER_API_KEY"],
-        model="openai/gpt-oss-120b:free",
+        api_key=api_key,
+        model=LLM_MODEL,
         temperature=0,
     )
 
-    gemini_embeddings = GoogleGenerativeAIEmbeddings(
-        model="gemini-embedding-2", output_dimensionality=1024
-    )
+    gemini_embeddings = GoogleGenerativeAIEmbeddings(model=EMBED_MODEL, output_dimensionality=1024)
     ragas_emb = LangchainEmbeddingsWrapper(gemini_embeddings)
 
     with open(GOLDEN_DATASET_PATH) as f:
@@ -51,9 +110,7 @@ async def run_evaluation():
         print(f"  [{item['id']}] {item['question'][:70]}...")
         result = await query_pipeline(item["question"])
 
-        answer = result.get("answer", "")
-        sources = result.get("sources", [])
-        contexts = [source.get("content", "") for source in sources]
+        answer, contexts = validate_response(result)
 
         questions.append(item["question"])
         ground_truths.append(item["ground_truth"])
@@ -109,6 +166,7 @@ async def run_evaluation():
     print("=" * 60)
 
     # Break down scores by question type
+    by_type = compute_avg_by_type(scores, question_types)
     print("\nScores by question type:")
     for q_type in [
         "single_paper_factual",
@@ -116,12 +174,12 @@ async def run_evaluation():
         "multi_hop_relational",
         "contradiction",
     ]:
-        indices = [i for i, t in enumerate(question_types) if t == q_type]
-        type_faithfulness = sum(scores["faithfulness"][i] for i in indices) / len(indices)
-        type_answer_relevancy = sum(scores["answer_relevancy"][i] for i in indices) / len(indices)
-        type_context_recall = sum(scores["context_recall"][i] for i in indices) / len(indices)
+        type_scores = by_type.get(q_type)
+        if type_scores is None:
+            print(f"  {q_type:30s}  (no samples)")
+            continue
         print(
-            f"  {q_type:30s}  faithfulness={type_faithfulness:.3f}  answer_relevancy={type_answer_relevancy:.3f}  context_recall={type_context_recall:.3f}  (n={len(indices)})"
+            f"  {q_type:30s}  faithfulness={type_scores['faithfulness']:.3f}  answer_relevancy={type_scores['answer_relevancy']:.3f}  context_recall={type_scores['context_recall']:.3f}"
         )
 
     # Save final scores
@@ -132,30 +190,7 @@ async def run_evaluation():
             "answer_relevancy": sum(scores["answer_relevancy"]) / len(scores["answer_relevancy"]),
             "context_recall": sum(scores["context_recall"]) / len(scores["context_recall"]),
         },
-        "by_question_type": {
-            q_type: {
-                "faithfulness": sum(
-                    scores["faithfulness"][i] for i, t in enumerate(question_types) if t == q_type
-                )
-                / len([t for t in question_types if t == q_type]),
-                "answer_relevancy": sum(
-                    scores["answer_relevancy"][i]
-                    for i, t in enumerate(question_types)
-                    if t == q_type
-                )
-                / len([t for t in question_types if t == q_type]),
-                "context_recall": sum(
-                    scores["context_recall"][i] for i, t in enumerate(question_types) if t == q_type
-                )
-                / len([t for t in question_types if t == q_type]),
-            }
-            for q_type in [
-                "single_paper_factual",
-                "cross_paper_comparison",
-                "multi_hop_relational",
-                "contradiction",
-            ]
-        },
+        "by_question_type": compute_avg_by_type(scores, question_types),
     }
 
     score_path = Path("api/eval/baseline_scores.json")
