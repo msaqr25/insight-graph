@@ -1,6 +1,9 @@
 # Uploaded Documents
 uploads/
 
+# Research papers used for evaluation
+papers/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
