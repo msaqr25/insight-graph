@@ -1,0 +1,162 @@
+[
+  {
+    "id": "q001",
+    "type": "single_paper_factual",
+    "question": "What two text corpora were used to pre-train BERT?",
+    "ground_truth": "BERT was pre-trained on BooksCorpus (800 million words) and English Wikipedia (2,500 million words).",
+    "required_papers": ["bert"],
+    "notes": "Tests basic factual recall from a single paper."
+  },
+  {
+    "id": "q002",
+    "type": "single_paper_factual",
+    "question": "What similarity function does Dense Passage Retrieval (DPR) use to score passage-question pairs at inference time?",
+    "ground_truth": "DPR uses the dot product of the dense vector representations of the question and passage produced by two independent BERT encoders.",
+    "required_papers": ["dpr"],
+    "notes": "Tests factual recall of a specific architectural choice."
+  },
+  {
+    "id": "q003",
+    "type": "single_paper_factual",
+    "question": "According to Kaplan et al.'s Scaling Laws paper, what are the three primary factors that determine language model performance?",
+    "ground_truth": "The three primary factors are model size (number of parameters, N), dataset size (number of training tokens, D), and the compute budget (C, measured in total FLOPs). Performance improves as a power law with each factor, and the paper argues model size is the most important when compute is fixed.",
+    "required_papers": ["scaling_laws"],
+    "notes": "Tests comprehension of the paper's central thesis."
+  },
+  {
+    "id": "q004",
+    "type": "single_paper_factual",
+    "question": "In LoRA, what does the hyperparameter r control, and what is its effect on the number of trainable parameters?",
+    "ground_truth": "The hyperparameter r is the rank of the low-rank decomposition matrices A and B. A lower r means fewer trainable parameters and a more constrained update, while a higher r allows a richer update at the cost of more parameters. The number of trainable parameters for a weight matrix of dimensions d x k is r*(d+k), so r directly scales the parameter count.",
+    "required_papers": ["lora"],
+    "notes": "Tests understanding of the paper's core mechanism."
+  },
+  {
+    "id": "q005",
+    "type": "single_paper_factual",
+    "question": "How many subjects does the MMLU benchmark cover, and what broad knowledge domains does it span?",
+    "ground_truth": "MMLU covers 57 subjects spanning STEM (mathematics, physics, chemistry, computer science, biology), the humanities (history, philosophy, law), social sciences (economics, psychology, sociology), and professional fields (medicine, accounting). Questions are formatted as four-choice multiple-choice problems.",
+    "required_papers": ["mmlu"],
+    "notes": "Tests basic factual recall about the benchmark's scope."
+  },
+  {
+    "id": "q006",
+    "type": "cross_paper_comparison",
+    "question": "How does GPT-3's approach to adapting to new tasks differ fundamentally from BERT's approach?",
+    "ground_truth": "BERT adapts to new tasks through fine-tuning: all model weights are updated via gradient descent on task-specific labeled data, requiring a separate model checkpoint per task. GPT-3 uses in-context few-shot learning: the model weights are never updated at all; instead, a few examples of the task are prepended to the prompt at inference time, and the model generalizes from them. This means GPT-3 requires no gradient updates and no task-specific training data, while BERT requires both.",
+    "required_papers": ["bert", "gpt3"],
+    "notes": "Core cross-paper comparison between the two dominant NLP paradigms."
+  },
+  {
+    "id": "q007",
+    "type": "cross_paper_comparison",
+    "question": "How do the pre-training objectives of BERT and GPT-3 differ, and what downstream capability does each objective favor?",
+    "ground_truth": "BERT uses Masked Language Modeling (MLM), where random tokens are masked and the model must predict them using both left and right context — making it bidirectional. It also uses Next Sentence Prediction (NSP). This bidirectionality makes BERT better suited for understanding and classification tasks. GPT-3 uses autoregressive (causal) language modeling, predicting the next token given only left context, making it unidirectional. This objective trains GPT-3 for text generation and enables few-shot prompting but limits its ability to condition on future context.",
+    "required_papers": ["bert", "gpt3"],
+    "notes": "Tests understanding of training objective differences and their consequences."
+  },
+  {
+    "id": "q008",
+    "type": "cross_paper_comparison",
+    "question": "How does LoRA's parameter-efficient fine-tuning strategy differ from prompt tuning as described by Lester et al.?",
+    "ground_truth": "LoRA modifies the model's weight matrices directly by injecting trainable low-rank decomposition matrices (A and B) alongside frozen pre-trained weights. The weight update delta_W = A*B is applied inside the model's layers. Prompt tuning, by contrast, keeps the entire model completely frozen and instead prepends a small set of trainable soft tokens (the 'prompt') to the input embedding sequence. LoRA modifies internal representations; prompt tuning only influences the input. Prompt tuning also tends to perform poorly on smaller models, while LoRA is more robust across scales.",
+    "required_papers": ["lora", "prompt_tuning"],
+    "notes": "Contrasts two major PEFT approaches on mechanism, not just performance."
+  },
+  {
+    "id": "q009",
+    "type": "cross_paper_comparison",
+    "question": "How does the ReAct framework extend Chain-of-Thought prompting, and what limitation of CoT does it address?",
+    "ground_truth": "Chain-of-Thought (CoT) prompting elicits multi-step reasoning by having the model generate intermediate reasoning traces before producing an answer. However, CoT reasoning is entirely internal — the model cannot access external information or verify facts beyond its training data. ReAct extends this by interleaving reasoning traces with action steps, where actions are calls to external tools such as search engines or APIs. The model reasons, acts, observes the result, and reasons again in a loop. This addresses CoT's inability to ground reasoning in up-to-date or factual external knowledge.",
+    "required_papers": ["chain_of_thought", "react"],
+    "notes": "Multi-paper comparison on a clear inheritance relationship."
+  },
+  {
+    "id": "q010",
+    "type": "cross_paper_comparison",
+    "question": "How do InstructGPT and Constitutional AI differ in how they reduce undesired model behavior?",
+    "ground_truth": "InstructGPT uses Reinforcement Learning from Human Feedback (RLHF): human labelers rank model outputs by preference, a reward model is trained on those rankings, and the policy is updated with PPO. This requires substantial human annotation effort. Constitutional AI (CAI) reduces dependence on human feedback by having the model critique and revise its own outputs based on a written set of principles (the 'constitution'), generating AI feedback rather than human feedback. CAI still uses RL in a later stage but trains the reward model on AI-generated preference data rather than human labels, making the process more scalable.",
+    "required_papers": ["instructgpt", "constitutional_ai"],
+    "notes": "Contrasts two alignment approaches on a key design axis: human vs. AI feedback."
+  },
+  {
+    "id": "q011",
+    "type": "multi_hop_relational",
+    "question": "The RAG paper uses a specific retrieval model to fetch relevant passages. What is that model, and in which paper was it originally introduced?",
+    "ground_truth": "RAG (Lewis et al.) uses Dense Passage Retrieval (DPR) as its retrieval component. DPR encodes questions and passages into dense vectors using separate BERT-based encoders and retrieves passages via maximum inner product search (MIPS) using FAISS. DPR was originally introduced in 'Dense Passage Retrieval for Open-Domain Question Answering' by Karpukhin et al. (2020). The RAG paper builds directly on DPR, combining it with a seq2seq generator (BART) to form the full retrieval-augmented generation pipeline.",
+    "required_papers": ["rag", "dpr"],
+    "notes": "Classic multi-hop: RAG → DPR → original paper. Tests graph traversal of USES and INTRODUCED_BY relations."
+  },
+  {
+    "id": "q012",
+    "type": "multi_hop_relational",
+    "question": "Vision Transformer (ViT) applies a Transformer to image patches. What specific mechanism from the original Transformer paper does ViT rely on as its core computational operation, and how does ViT adapt it for image data?",
+    "ground_truth": "ViT relies on the multi-head self-attention mechanism introduced in 'Attention Is All You Need' (Vaswani et al., 2017). In the original Transformer, self-attention operates over sequences of token embeddings in NLP. ViT adapts this by splitting an image into fixed-size patches (e.g., 16x16 pixels), linearly projecting each patch into an embedding, and treating the sequence of patch embeddings as the input sequence. A class token is prepended, and positional embeddings are added, after which the standard Transformer encoder with multi-head self-attention processes the sequence for classification.",
+    "required_papers": ["attention_is_all_you_need", "vit"],
+    "notes": "Requires knowing ViT's architecture and tracing its core component back to the original Transformer."
+  },
+  {
+    "id": "q013",
+    "type": "multi_hop_relational",
+    "question": "FlashAttention is described as an IO-aware implementation of exact attention. What attention computation is it optimizing, and in which paper was that computation originally defined?",
+    "ground_truth": "FlashAttention (Dao et al., 2022) optimizes the scaled dot-product attention computation: Attention(Q, K, V) = softmax(QK^T / sqrt(d_k)) * V. This computation was defined in 'Attention Is All You Need' (Vaswani et al., 2017). FlashAttention does not change the mathematical result — it produces exactly the same output — but restructures the computation to minimize reads and writes between GPU HBM (high-bandwidth memory) and SRAM, using tiling and kernel fusion. The bottleneck it addresses is memory bandwidth, not FLOPs.",
+    "required_papers": ["attention_is_all_you_need", "flashattention"],
+    "notes": "Requires tracing FlashAttention's optimization target back to the Transformer paper."
+  },
+  {
+    "id": "q014",
+    "type": "multi_hop_relational",
+    "question": "CLIP trains a vision-language model using contrastive learning. What kind of training data does CLIP use, and how does this differ from the supervised dataset used to train BERT?",
+    "ground_truth": "CLIP (Radford et al., 2021) is trained on 400 million (image, text) pairs scraped from the internet, using a contrastive objective that aligns image and text embeddings in a shared latent space — no manual labels are required. BERT, by contrast, is pre-trained on BookCorpus and English Wikipedia using self-supervised objectives (MLM and NSP) derived from the text structure itself. The key difference is modality: CLIP learns a joint vision-language representation from noisy web-scale image-caption pairs, while BERT learns purely from text. Both are self-supervised, but CLIP's supervision comes from natural language descriptions of images rather than masked tokens.",
+    "required_papers": ["clip", "bert"],
+    "notes": "Multi-hop connecting CLIP's training data choice back to BERT for comparison."
+  },
+  {
+    "id": "q015",
+    "type": "multi_hop_relational",
+    "question": "The Mixtral paper introduces a Mixture of Experts architecture. Which earlier concept of sparse expert routing does it build on, and how does the routing mechanism work at inference time?",
+    "ground_truth": "Mixtral (Jiang et al., 2024) builds on the Mixture of Experts (MoE) concept, using a sparse top-K gating mechanism. At each Transformer layer, the feedforward network (FFN) is replaced by multiple expert FFNs (Mixtral uses 8 experts per layer). A router network computes a probability score for each expert and selects the top-2 experts per token. Only those two experts process the token; the others are skipped. This means the model has a large total parameter count (46.7B) but only activates 12.9B parameters per forward pass, making it computationally efficient at inference while retaining capacity. The sparse routing idea traces back to 'Outrageously Large Neural Networks: The Sparsely-Gated Mixture-of-Experts Layer' (Shazeer et al., 2017).",
+    "required_papers": ["mixtral"],
+    "notes": "Tests understanding of MoE routing and the lineage of the architecture."
+  },
+  {
+    "id": "q016",
+    "type": "contradiction",
+    "question": "Do the Scaling Laws paper (Kaplan et al.) and the Chinchilla paper (Hoffmann et al.) agree on the optimal strategy for allocating a fixed compute budget between model size and training data?",
+    "ground_truth": "No, they disagree significantly. Kaplan et al. concluded that model size should be scaled faster than dataset size when compute is fixed — their experiments suggested training large models on relatively modest amounts of data. Hoffmann et al. (Chinchilla) directly challenged this, showing through careful experiments that for a fixed compute budget, model size and training tokens should be scaled in roughly equal proportion. Their Chinchilla model (70B parameters, 1.4T tokens) outperformed the much larger Gopher (280B parameters, 300B tokens) despite using less compute, demonstrating that prior large models including GPT-3 were significantly undertrained. The Chinchilla paper effectively revised the scaling law recommendations.",
+    "required_papers": ["scaling_laws", "chinchilla"],
+    "notes": "Direct contradiction between two papers on the same topic."
+  },
+  {
+    "id": "q017",
+    "type": "contradiction",
+    "question": "Do BERT and GPT-3 agree on whether bidirectional or unidirectional language modeling produces more capable models?",
+    "ground_truth": "They implicitly disagree, and the disagreement reflects different definitions of capability. BERT argues that bidirectional context (reading both left and right) produces richer representations for understanding tasks, and that unidirectional models like GPT are fundamentally limited for tasks such as question answering and NLI. GPT-3 demonstrates that unidirectional autoregressive modeling at sufficient scale achieves strong performance across a wide range of tasks — including understanding tasks — without bidirectionality. The two papers do not directly rebut each other, but their architectural choices reflect opposing positions: BERT sacrifices generative capability for bidirectionality, while GPT-3 sacrifices bidirectionality for scale and generativity. Subsequent work generally showed that scale can compensate for unidirectionality.",
+    "required_papers": ["bert", "gpt3"],
+    "notes": "Nuanced contradiction — neither paper explicitly attacks the other, but their architectures are direct opposites."
+  },
+  {
+    "id": "q018",
+    "type": "contradiction",
+    "question": "Do the Scaling Laws paper (Kaplan et al.) and FlashAttention (Dao et al.) address the same bottleneck in training large language models?",
+    "ground_truth": "No, they address entirely different bottlenecks. Kaplan et al. treat model performance as a function of compute, parameters, and data — their analysis is algorithmic and statistical, concerned with how much to train and how large to make a model. They do not address hardware efficiency. FlashAttention addresses a hardware bottleneck: the memory bandwidth between GPU HBM and SRAM. It does not change what model you train or how much data you use; it makes the attention computation faster and more memory-efficient for any model size. The two papers are complementary rather than contradictory — Scaling Laws tells you what to train, FlashAttention helps you train it faster — but they operate at completely different levels of the stack.",
+    "required_papers": ["scaling_laws", "flashattention"],
+    "notes": "Tests whether the system understands the level of abstraction each paper operates at."
+  },
+  {
+    "id": "q019",
+    "type": "contradiction",
+    "question": "Constitutional AI claims to reduce the need for human feedback in alignment. Does InstructGPT's evidence support or undermine this claim?",
+    "ground_truth": "InstructGPT's evidence is consistent with the premise that motivates Constitutional AI, but it does not directly support or undermine CAI's specific claim. InstructGPT demonstrates that RLHF with human feedback is effective but operationally expensive — it required contractor labelers to rank outputs. This expense is exactly the problem Constitutional AI is designed to solve by replacing human preference labels with AI-generated critique based on a written constitution. InstructGPT does not compare against AI-feedback methods, so it cannot refute CAI's approach. However, InstructGPT's strong results do set a high bar: CAI must match RLHF quality with less human input. The two papers are sequential — CAI was published after InstructGPT and explicitly acknowledges RLHF as the baseline it is improving upon.",
+    "required_papers": ["instructgpt", "constitutional_ai"],
+    "notes": "Tests nuanced reasoning about the relationship between evidence and claims across papers."
+  },
+  {
+    "id": "q020",
+    "type": "contradiction",
+    "question": "Graph Attention Networks (GAT) and the original Transformer both use attention mechanisms. Do they agree on how attention weights should be computed?",
+    "ground_truth": "They use different attention formulations suited to their different structural contexts. The Transformer (Vaswani et al.) uses scaled dot-product attention: attention weights are computed as the softmax of the dot product of query and key vectors, scaled by sqrt(d_k). This operates over dense, fully-connected sequences. Graph Attention Networks (Veličković et al.) compute attention coefficients between a node and its neighbors using a shared linear transformation followed by a LeakyReLU-activated single-layer feedforward network (a learned weight vector applied to the concatenated node features). The key difference is that GAT attention is defined over a graph's adjacency structure (only neighbors attend to each other), while Transformer attention is global and position-based. Both use softmax normalization over the relevant set, but the scoring function and structural constraints differ substantially.",
+    "required_papers": ["gat", "attention_is_all_you_need"],
+    "notes": "Requires understanding both attention formulations at a technical level and articulating the key difference."
+  }
+]
