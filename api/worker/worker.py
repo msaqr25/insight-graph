@@ -2,10 +2,12 @@ import httpx
 from sentence_transformers import SentenceTransformer
 
 from api.config import settings
+from api.graph.neo4j_client import close_neo4j
 from api.worker.config import REDIS_SETTINGS
 from api.worker.tasks import (
     chunk_text_task,
     embed_and_store,
+    extract_entities_task,
     extract_text,
 )
 
@@ -18,12 +20,13 @@ async def startup(ctx):
 
 async def shutdown(ctx):
     await ctx["http_client"].aclose()
+    await close_neo4j()
     del ctx["embedding_model"]
     print("Worker shut down, resources cleaned up.")
 
 
 class WorkerSettings:
-    functions = [extract_text, chunk_text_task, embed_and_store]
+    functions = [extract_text, chunk_text_task, embed_and_store, extract_entities_task]
     redis_settings = REDIS_SETTINGS
     on_startup = startup
     on_shutdown = shutdown

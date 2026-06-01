@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     COSINE_TOP_K: int = 20
     RERANK_TOP_K: int = 3
 
+    NEO4J_URI: str = "bolt://localhost:7687"
+    NEO4J_USER: str = "neo4j"
+    NEO4J_PASSWORD: str
+    NEO4J_DATABASE: str = "neo4j"
+
     CHUNK_MIN_SIZE: int = 200
     CHUNK_MAX_SIZE: int = 1000
     CHUNK_OVERLAP: int = 50
